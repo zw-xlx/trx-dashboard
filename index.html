@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRX 策略收益看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3;padding:0}
+.top-nav{position:sticky;top:0;z-index:100;background:#161b22;border-bottom:1px solid #30363d;padding:8px 16px;display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.top-nav a{color:#8b949e;text-decoration:none;font-size:0.82em;padding:6px 12px;border-radius:6px;white-space:nowrap;transition:all .2s}
+.top-nav a:hover,.top-nav a.active{color:#e6edf3;background:#21262d}
+.top-nav .brand{color:#58a6ff;font-weight:700;font-size:0.95em;margin-right:8px;white-space:nowrap}
+.section{padding:20px 16px 30px;max-width:1000px;margin:0 auto}
+.section-title{font-size:1.3em;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.section-sub{color:#8b949e;font-size:0.85em;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.stat-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center}
+.stat-value{font-size:1.6em;font-weight:700;color:#58a6ff}
+.stat-value.profit{color:#3fb950}
+.stat-value.loss{color:#f85149}
+.stat-value.neutral{color:#58a6ff}
+.stat-label{font-size:0.75em;color:#8b949e;margin-top:2px}
+.chart-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;margin-bottom:16px}
+.chart-wrap{position:relative;height:320px}
+.divider{border:0;border-top:1px solid #21262d;margin:0}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px}
+.summary-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+.summary-card h3{font-size:0.9em;color:#8b949e;margin-bottom:10px}
+.summary-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #21262d;font-size:0.85em}
+.summary-row:last-child{border-bottom:none}
+.summary-row .label{color:#8b949e}
+.summary-row .value{font-weight:600}
+.summary-row .value.profit{color:#3fb950}
+.summary-row .value.loss{color:#f85149}
+footer{text-align:center;color:#484f58;font-size:0.72em;padding:20px 16px 30px}
+footer a{color:#58a6ff;text-decoration:none}
+@media(max-width:600px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .chart-wrap{height:240px}
+  .summary-grid{grid-template-columns:1fr}
+  .stat-value{font-size:1.3em}
+}
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <span class="brand">💰 TRX 策略收益看板</span>
+  <a href="#sec-overview">今日概览</a>
+  <a href="#sec-trend">收益趋势</a>
+  <a href="#sec-breakdown">收益构成</a>
+  <a href="#sec-rate">费率盈亏</a>
+  <a href="#sec-summary">周度/月度汇总</a>
+  <a href="#sec-apy">年化收益率</a>
+</nav>
+
+<!-- ============ 今日概览 ============ -->
+<div class="section" id="sec-overview">
+  <div class="section-title">📊 今日概览</div>
+  <p class="section-sub" id="overview-sub"></p>
+  <div class="stats" id="overview-stats"></div>
+</div>
+<hr class="divider">
+
+<!-- ============ 收益趋势 ============ -->
+<div class="section" id="sec-trend">
+  <div class="section-title">📈 每日总收益趋势</div>
+  <p class="section-sub">每日策略总收益（能量授权 + 投票 + 费率盈亏）</p>
+  <div class="chart-box"><div class="chart-wrap"><canvas id="chart-trend"></canvas></div></div>
+</div>
+<hr class="divider">
+
+<!-- ============ 收益构成 ============ -->
+<div class="section" id="sec-breakdown">
+  <div class="section-title">🧩 收益构成分解</div>
+  <p class="section-sub">堆叠柱状图：能量授权 / 投票奖励 / 费率盈亏</p>
+  <div class="chart-box"><div class="chart-wrap"><canvas id="chart-breakdown"></canvas></div></div>
+</div>
+<hr class="divider">
+
+<!-- ============ 费率盈亏 ============ -->
+<div class="section" id="sec-rate">
+  <div class="section-title">💱 费率盈亏</div>
+  <p class="section-sub">TRX 价格波动带来的盈亏（绿色盈利，红色亏损）</p>
+  <div class="chart-box"><div class="chart-wrap"><canvas id="chart-rate"></canvas></div></div>
+</div>
+<hr class="divider">
+
+<!-- ============ 周度/月度汇总 ============ -->
+<div class="section" id="sec-summary">
+  <div class="section-title">📅 周度 / 月度汇总</div>
+  <p class="section-sub">按周、月聚合的收益统计</p>
+  <div class="summary-grid" id="summary-grid"></div>
+  <div class="chart-box"><div class="chart-wrap"><canvas id="chart-weekly"></canvas></div></div>
+</div>
+<hr class="divider">
+
+<!-- ============ 年化收益率 ============ -->
+<div class="section" id="sec-apy">
+  <div class="section-title">🎯 年化收益率走势</div>
+  <p class="section-sub">每日年化收益率（%）</p>
+  <div class="chart-box"><div class="chart-wrap"><canvas id="chart-apy"></canvas></div></div>
+</div>
+
+<footer>
+  TRX 策略收益看板 · 数据更新至 <span id="last-update"></span><br>
+  Built by <a href="https://github.com/zw-xlx" target="_blank">zw-xlx</a>
+</footer>
+
+<script>
+// ==================== DATA ====================
+const RAW_DATA = [
+  { date:"2026-03-10", energy:748,  vote:121, rate:-544, total:324,  apy:null },
+  { date:"2026-03-11", energy:762,  vote:123, rate:-441, total:444,  apy:null },
+  { date:"2026-03-12", energy:760,  vote:122, rate:267,  total:1150, apy:30.70 },
+  { date:"2026-03-13", energy:768,  vote:124, rate:-447, total:445,  apy:11.77 },
+  { date:"2026-03-14", energy:770,  vote:124, rate:146,  total:1040, apy:27.04 },
+  { date:"2026-03-15", energy:770,  vote:124, rate:159,  total:1053, apy:27.38 },
+  { date:"2026-03-16", energy:775,  vote:125, rate:-68,  total:832,  apy:21.80 },
+  { date:"2026-03-17", energy:808,  vote:130, rate:-94,  total:844,  apy:21.09 },
+  { date:"2026-03-19", energy:810,  vote:130, rate:128,  total:1068, apy:26.70 },
+  { date:"2026-03-20", energy:809,  vote:130, rate:-86,  total:854,  apy:21.42 },
+  { date:"2026-03-21", energy:815,  vote:131, rate:301,  total:1247, apy:31.05 },
+  { date:"2026-03-22", energy:813,  vote:131, rate:-38,  total:906,  apy:22.62 },
+  { date:"2026-03-23", energy:809,  vote:130, rate:-178, total:761,  apy:19.10 },
+  { date:"2026-03-24", energy:802,  vote:129, rate:62,   total:994,  apy:25.14 },
+  { date:"2026-03-25", energy:822,  vote:132, rate:-278, total:677,  apy:16.71 },
+  { date:"2026-03-26", energy:815,  vote:131, rate:263,  total:1210, apy:30.12 },
+  { date:"2026-03-27", energy:3296, vote:131, rate:-52,  total:3374, apy:84.24 },
+  { date:"2026-03-28", energy:829,  vote:133, rate:-314, total:648,  apy:15.88 },
+  { date:"2026-03-29", energy:840,  vote:135, rate:-62,  total:913,  apy:22.08 },
+  { date:"2026-03-30", energy:838,  vote:135, rate:12,   total:985,  apy:23.85 },
+  { date:"2026-03-31", energy:829,  vote:134, rate:-43,  total:919,  apy:22.51 },
+  { date:"2026-04-01", energy:828,  vote:133, rate:-405, total:557,  apy:13.65 },
+  { date:"2026-04-02", energy:826,  vote:133, rate:109,  total:1068, apy:26.24 },
+  { date:"2026-04-03", energy:827,  vote:133, rate:-195, total:765,  apy:18.78 },
+  { date:"2026-04-04", energy:832,  vote:134, rate:213,  total:1179, apy:28.77 },
+  { date:"2026-04-05", energy:836,  vote:135, rate:99,   total:1069, apy:25.97 },
+  { date:"2026-04-06", energy:829,  vote:133, rate:-222, total:740,  apy:18.12 },
+  { date:"2026-04-07", energy:826,  vote:133, rate:-396, total:564,  apy:13.84 },
+  { date:"2026-04-08", energy:833,  vote:134, rate:-669, total:298,  apy:7.27 }
+];
+
+// ==================== HELPERS ====================
+const fmt$ = v => (v >= 0 ? '+' : '') + '$' + v.toLocaleString();
+const fmtAbs$ = v => '$' + Math.abs(v).toLocaleString();
+const labels = RAW_DATA.map(d => d.date.slice(5)); // MM-DD
+
+// Chart.js global defaults
+Chart.defaults.color = '#8b949e';
+Chart.defaults.borderColor = '#21262d';
+Chart.defaults.font.family = '-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif';
+Chart.defaults.font.size = 11;
+
+// ==================== 1. 今日概览 ====================
+(function renderOverview() {
+  const today = RAW_DATA[RAW_DATA.length - 1];
+  const cumTotal = RAW_DATA.reduce((s, d) => s + d.total, 0);
+  const days = RAW_DATA.length;
+  const avgDaily = Math.round(cumTotal / days);
+  const apyVals = RAW_DATA.filter(d => d.apy !== null).map(d => d.apy);
+  const avgApy = apyVals.length ? (apyVals.reduce((a,b) => a+b, 0) / apyVals.length).toFixed(2) : '—';
+
+  document.getElementById('overview-sub').textContent =
+    `最新数据：${today.date} · 运行 ${days} 天 · 累计 ${days} 条记录`;
+
+  const statsEl = document.getElementById('overview-stats');
+  const cards = [
+    { label:'今日总收益', value: fmt$(today.total), cls: today.total >= 0 ? 'profit' : 'loss' },
+    { label:'今日年化', value: today.apy !== null ? today.apy + '%' : '—', cls: (today.apy||0) >= 20 ? 'profit' : (today.apy||0) >= 10 ? 'neutral' : 'loss' },
+    { label:'累计总收益', value: '$' + cumTotal.toLocaleString(), cls: cumTotal >= 0 ? 'profit' : 'loss' },
+    { label:'日均收益', value: '$' + avgDaily.toLocaleString(), cls: avgDaily >= 0 ? 'profit' : 'loss' },
+    { label:'平均年化', value: avgApy + '%', cls: parseFloat(avgApy) >= 20 ? 'profit' : 'neutral' },
+    { label:'运行天数', value: days + '天', cls: 'neutral' }
+  ];
+  statsEl.innerHTML = cards.map(c =>
+    `<div class="stat-card"><div class="stat-value ${c.cls}">${c.value}</div><div class="stat-label">${c.label}</div></div>`
+  ).join('');
+
+  document.getElementById('last-update').textContent = today.date;
+})();
+
+// ==================== 2. 收益趋势折线图 ====================
+new Chart(document.getElementById('chart-trend'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: '每日总收益 ($)',
+      data: RAW_DATA.map(d => d.total),
+      borderColor: '#58a6ff',
+      backgroundColor: 'rgba(88,166,255,0.1)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      pointBackgroundColor: RAW_DATA.map(d => d.total >= 800 ? '#3fb950' : d.total < 500 ? '#f85149' : '#58a6ff')
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => RAW_DATA[items[0].dataIndex].date,
+          label: (item) => '总收益: $' + item.raw.toLocaleString()
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: { color: '#21262d' },
+        ticks: { callback: v => '$' + v }
+      },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ==================== 3. 收益构成堆叠柱状图 ====================
+new Chart(document.getElementById('chart-breakdown'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: '能量授权',
+        data: RAW_DATA.map(d => d.energy),
+        backgroundColor: '#3fb950',
+        borderRadius: 2
+      },
+      {
+        label: '投票奖励',
+        data: RAW_DATA.map(d => d.vote),
+        backgroundColor: '#58a6ff',
+        borderRadius: 2
+      },
+      {
+        label: '费率盈亏',
+        data: RAW_DATA.map(d => d.rate),
+        backgroundColor: RAW_DATA.map(d => d.rate >= 0 ? 'rgba(63,185,80,0.6)' : 'rgba(248,81,73,0.6)'),
+        borderRadius: 2
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rectRounded', padding: 16 } },
+      tooltip: {
+        callbacks: {
+          title: (items) => RAW_DATA[items[0].dataIndex].date
+        }
+      }
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false } },
+      y: {
+        stacked: true,
+        grid: { color: '#21262d' },
+        ticks: { callback: v => '$' + v }
+      }
+    }
+  }
+});
+
+// ==================== 4. 费率盈亏柱状图 ====================
+new Chart(document.getElementById('chart-rate'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: '费率盈亏 ($)',
+      data: RAW_DATA.map(d => d.rate),
+      backgroundColor: RAW_DATA.map(d => d.rate >= 0 ? '#3fb950' : '#f85149'),
+      borderRadius: 3
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => RAW_DATA[items[0].dataIndex].date,
+          label: (item) => '费率盈亏: ' + fmt$(item.raw)
+        }
+      }
+    },
+    scales: {
+      y: {
+        grid: { color: '#21262d' },
+        ticks: { callback: v => (v >= 0 ? '+$' : '-$') + Math.abs(v) }
+      },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ==================== 5. 周度/月度汇总 ====================
+(function renderSummary() {
+  // Group by ISO week
+  function getWeekKey(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay() || 7;
+    d.setDate(d.getDate() + 4 - day);
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
+  }
+
+  // Group by month
+  function getMonthKey(dateStr) { return dateStr.slice(0, 7); }
+
+  const weekMap = {}, monthMap = {};
+  RAW_DATA.forEach(d => {
+    const wk = getWeekKey(d.date);
+    if (!weekMap[wk]) weekMap[wk] = { total: 0, count: 0, energy: 0, vote: 0, rate: 0 };
+    weekMap[wk].total += d.total;
+    weekMap[wk].energy += d.energy;
+    weekMap[wk].vote += d.vote;
+    weekMap[wk].rate += d.rate;
+    weekMap[wk].count++;
+
+    const mk = getMonthKey(d.date);
+    if (!monthMap[mk]) monthMap[mk] = { total: 0, count: 0, energy: 0, vote: 0, rate: 0 };
+    monthMap[mk].total += d.total;
+    monthMap[mk].energy += d.energy;
+    monthMap[mk].vote += d.vote;
+    monthMap[mk].rate += d.rate;
+    monthMap[mk].count++;
+  });
+
+  const grid = document.getElementById('summary-grid');
+
+  // Weekly summary card
+  let weekHtml = '<div class="summary-card"><h3>📆 周度汇总</h3>';
+  Object.entries(weekMap).forEach(([wk, v]) => {
+    const avg = Math.round(v.total / v.count);
+    const cls = v.total >= 0 ? 'profit' : 'loss';
+    weekHtml += `<div class="summary-row"><span class="label">${wk} (${v.count}天)</span><span class="value ${cls}">$${v.total.toLocaleString()} · 日均$${avg}</span></div>`;
+  });
+  weekHtml += '</div>';
+
+  // Monthly summary card
+  let monthHtml = '<div class="summary-card"><h3>📅 月度汇总</h3>';
+  Object.entries(monthMap).forEach(([mk, v]) => {
+    const avg = Math.round(v.total / v.count);
+    const cls = v.total >= 0 ? 'profit' : 'loss';
+    monthHtml += `<div class="summary-row"><span class="label">${mk} (${v.count}天)</span><span class="value ${cls}">$${v.total.toLocaleString()} · 日均$${avg}</span></div>`;
+  });
+  monthHtml += '</div>';
+
+  grid.innerHTML = weekHtml + monthHtml;
+
+  // Weekly bar chart
+  const weekKeys = Object.keys(weekMap);
+  const weekTotals = weekKeys.map(k => weekMap[k].total);
+
+  new Chart(document.getElementById('chart-weekly'), {
+    type: 'bar',
+    data: {
+      labels: weekKeys,
+      datasets: [{
+        label: '周度总收益 ($)',
+        data: weekTotals,
+        backgroundColor: weekTotals.map(v => v >= 5000 ? '#3fb950' : v >= 3000 ? '#58a6ff' : '#d29922'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const wk = weekKeys[item.dataIndex];
+              const v = weekMap[wk];
+              return [`总收益: $${v.total.toLocaleString()}`, `能量: $${v.energy.toLocaleString()}`, `投票: $${v.vote.toLocaleString()}`, `费率: ${fmt$(v.rate)}`];
+            }
+          }
+        }
+      },
+      scales: {
+        y: { grid: { color: '#21262d' }, ticks: { callback: v => '$' + v } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+})();
+
+// ==================== 6. 年化收益率折线图 ====================
+(function renderApy() {
+  const apyData = RAW_DATA.filter(d => d.apy !== null);
+  const apyLabels = apyData.map(d => d.date.slice(5));
+  const apyValues = apyData.map(d => d.apy);
+  const avgApy = apyValues.reduce((a, b) => a + b, 0) / apyValues.length;
+
+  new Chart(document.getElementById('chart-apy'), {
+    type: 'line',
+    data: {
+      labels: apyLabels,
+      datasets: [
+        {
+          label: '每日年化 (%)',
+          data: apyValues,
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88,166,255,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointHoverRadius: 7,
+          pointBackgroundColor: apyValues.map(v => v >= 25 ? '#3fb950' : v >= 15 ? '#d29922' : '#f85149')
+        },
+        {
+          label: '平均年化',
+          data: apyValues.map(() => avgApy),
+          borderColor: '#f0883e',
+          borderDash: [6, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+        tooltip: {
+          callbacks: {
+            title: (items) => apyData[items[0].dataIndex].date,
+            label: (item) => item.dataset.label + ': ' + item.raw.toFixed(2) + '%'
+          }
+        }
+      },
+      scales: {
+        y: {
+          grid: { color: '#21262d' },
+          ticks: { callback: v => v + '%' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+})();
+
+// ==================== NAV HIGHLIGHT ====================
+(function setupNav() {
+  const nav = document.querySelector('.top-nav');
+  const links = nav.querySelectorAll('a[href^="#"]');
+  const sections = [...links].map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+  function onScroll() {
+    let cur = 0;
+    sections.forEach((sec, i) => {
+      if (window.scrollY + 80 >= sec.offsetTop) cur = i;
+    });
+    links.forEach((a, i) => a.classList.toggle('active', i === cur));
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>
