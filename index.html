@@ -128,7 +128,7 @@ const RAW_DATA = [
   { date:"2026-03-24", energy:802,  vote:129, rate:62,   total:994,  apy:25.14 },
   { date:"2026-03-25", energy:822,  vote:132, rate:-278, total:677,  apy:16.71 },
   { date:"2026-03-26", energy:815,  vote:131, rate:263,  total:1210, apy:30.12 },
-  { date:"2026-03-27", energy:3296, vote:131, rate:-52,  total:3374, apy:84.24 },
+  { date:"2026-03-27", energy:830,  vote:131, rate:-52,  total:909,  apy:22.72 },
   { date:"2026-03-28", energy:829,  vote:133, rate:-314, total:648,  apy:15.88 },
   { date:"2026-03-29", energy:840,  vote:135, rate:-62,  total:913,  apy:22.08 },
   { date:"2026-03-30", energy:838,  vote:135, rate:12,   total:985,  apy:23.85 },
@@ -306,14 +306,18 @@ new Chart(document.getElementById('chart-rate'), {
 
 // ==================== 5. 周度/月度汇总 ====================
 (function renderSummary() {
-  // Group by ISO week
+  // Group by ISO week with date range
   function getWeekKey(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     const day = d.getDay() || 7;
-    d.setDate(d.getDate() + 4 - day);
-    const yearStart = new Date(d.getFullYear(), 0, 1);
-    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
+    // Monday of this week
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - day + 1);
+    // Sunday of this week
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const fmt = dt => (dt.getMonth()+1) + '/' + dt.getDate();
+    return fmt(mon) + '~' + fmt(sun);
   }
 
   // Group by month
