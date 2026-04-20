@@ -204,13 +204,41 @@ Chart.defaults.font.size = 11;
     { label:'累计总收益', value: '$' + cumTotal.toLocaleString(), cls: cumTotal >= 0 ? 'profit' : 'loss' },
     { label:'日均收益', value: '$' + avgDaily.toLocaleString(), cls: avgDaily >= 0 ? 'profit' : 'loss' },
     { label:'平均年化', value: avgApy + '%', cls: parseFloat(avgApy) >= 20 ? 'profit' : 'neutral' },
-    { label:'运行天数', value: days + '天', cls: 'neutral' }
+    { label:'运行天数', value: days + '天', cls: 'neutral' },
+    { label:'地址余额', value: '<span id="addr-bal">加载中…</span>', cls: 'neutral', id:'card-addr' }
   ];
   statsEl.innerHTML = cards.map(c =>
     `<div class="stat-card"><div class="stat-value ${c.cls}">${c.value}</div><div class="stat-label">${c.label}</div></div>`
   ).join('');
 
   document.getElementById('last-update').textContent = today.date;
+
+  // 异步拉取链上余额（TQYyeapGyCb884zwwBduZWeK1mZKGkupui）
+  (async function loadBalance() {
+    const addr = 'TQYyeapGyCb884zwwBduZWeK1mZKGkupui';
+    try {
+      const [accResp, priceResp] = await Promise.all([
+        fetch('https://api.trongrid.io/v1/accounts/' + addr),
+        fetch('https://api.binance.com/api/v3/ticker/price?symbol=TRXUSDT')
+      ]);
+      const acc = await accResp.json();
+      const priceJson = await priceResp.json();
+      const data = (acc.data && acc.data[0]) || {};
+      const liquid = (data.balance || 0) / 1e6;
+      let frozen = 0;
+      (data.frozenV2 || []).forEach(f => frozen += (f.amount || 0) / 1e6);
+      const totalTrx = liquid + frozen;
+      const price = parseFloat(priceJson.price);
+      const usd = totalTrx * price;
+      document.getElementById('addr-bal').innerHTML =
+        '$' + Math.round(usd).toLocaleString() +
+        '<div style="font-size:11px;color:#8b949e;margin-top:4px">' +
+        Math.round(totalTrx).toLocaleString() + ' TRX · $' + price.toFixed(4) + '</div>';
+    } catch (e) {
+      document.getElementById('addr-bal').textContent = '加载失败';
+      console.error('balance fetch error:', e);
+    }
+  })();
 })();
 
 // ==================== 2. 收益趋势折线图 ====================
